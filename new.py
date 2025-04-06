@@ -4,14 +4,7 @@ import re
 import os
 import pandas as pd
 import tabula
-import PyPDF2
 
-def extrair_texto(caminho_pdf):
-    """Extrai todo o texto de um PDF usando PyPDF2."""
-    with open(caminho_pdf, 'rb') as arquivo:
-        leitor = PyPDF2.PdfReader(arquivo)
-        texto = "".join(pagina.extract_text() for pagina in leitor.pages)
-    return texto
 
 def extrair_dados_pessoais(texto):
     """Extrai informações pessoais do texto usando expressões regulares."""
@@ -55,7 +48,8 @@ def processar_pdfs(pasta_pdfs):
     for arquivo in os.listdir(pasta_pdfs):
         if arquivo.endswith('.pdf'):
             caminho_pdf = os.path.join(pasta_pdfs, arquivo)
-            texto = extrair_texto(caminho_pdf)
+            
+            texto = ""
             dados_pessoais = extrair_dados_pessoais(texto)
             tabela = extrair_tabela(caminho_pdf)
 
@@ -144,12 +138,12 @@ def download_pdf(matricula=None, senha=None, vinculo=1):
         print(f"Erro ao converter para PDF: {e}")
         return False
 
-if __name__ == "__main__":
-    endereco = download_pdf(matricula="00706000", senha="cyovqytx", vinculo=2)
+# if __name__ == "__main__":
+#     endereco = download_pdf(matricula="00706000", senha="cyovqytx", vinculo=2)
 
-    # "http://servicos.searh.rn.gov.br/searh/copag/contrachk.asp?matricula=00706000&vinculo=1&cpf=cyovqytx&ano=2003&mes=1&tipofolha="
+#     # "http://servicos.searh.rn.gov.br/searh/copag/contrachk.asp?matricula=00706000&vinculo=1&cpf=cyovqytx&ano=2003&mes=1&tipofolha="
 
-    # Configuração e execução
+#     # Configuração e execução
 if __name__ == "__main__":
     pasta_pdfs = "folha/default"  # Ajuste para o seu diretório
     df = processar_pdfs(pasta_pdfs)
