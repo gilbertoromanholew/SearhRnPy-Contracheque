@@ -1,15 +1,5 @@
 import requests
 import pdfkit
-
-
-
-
-
-
-
-
-
-
 import re
 
 def converter_numero(valor):
