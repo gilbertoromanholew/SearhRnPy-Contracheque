@@ -2,16 +2,67 @@ import requests
 import pdfkit
 import re
 import os
-
+import pandas as pd
+import tabula
 import PyPDF2
 
-def extrair_texto_pdf(caminho_pdf):
+def extrair_texto(caminho_pdf):
+    """Extrai todo o texto de um PDF usando PyPDF2."""
     with open(caminho_pdf, 'rb') as arquivo:
         leitor = PyPDF2.PdfReader(arquivo)
-        texto = ""
-        for pagina in leitor.pages:
-            texto += pagina.extract_text()
+        texto = "".join(pagina.extract_text() for pagina in leitor.pages)
     return texto
+
+def extrair_dados_pessoais(texto):
+    """Extrai informações pessoais do texto usando expressões regulares."""
+    padroes = {
+        'NOME': r"NOME\s+([A-Z\s]+)\s+MATRÍCULA",
+        'MATRÍCULA': r"MATRÍCULA\s+([\d\-]+)\s+VINC\.",
+        'VINC.': r"VINC\.\s+(\d+)\s+PENSÃO",
+        'PENSÃO': r"PENSÃO\s+([\w\-]+)\s+CARGO",
+        'CARGO': r"CARGO\s+([\w\s\-]+)\s+REFERÊNCIA",
+        'REFERÊNCIA': r"REFERÊNCIA\s+([\w\d]+)\s+PIS/PASEP",
+        'PIS/PASEP': r"PIS/PASEP\s+([\d]+)\s+FUNÇÃO",
+        'FUNÇÃO': r"FUNÇÃO\s+([\w\s\-]+)\s+BCO/AGÊNCIA",
+        'BCO/AGÊNCIA': r"BCO/AGÊNCIA\s+([\d/]+)\s+CONTA",
+        'CONTA': r"CONTA\s+([\d]+)\s+LOTAÇÃO",
+        'LOTAÇÃO': r"LOTAÇÃO\s+([\d\s\w\-]+)\s+DEP IR",
+        'DEP IR': r"DEP IR\s+([\w\-]+)\s+DEP SF",
+        'DEP SF': r"DEP SF\s+([\w\-]+)\s+CPF",
+        'CPF': r"CPF\s+([\d\-\.]+)\s+CÓDIGO"
+    }
+    return {chave: (re.search(padrao, texto, re.IGNORECASE).group(1).strip() if re.search(padrao, texto, re.IGNORECASE) else "")
+            for chave, padrao in padroes.items()}
+
+def extrair_tabela(caminho_pdf):
+    """Lê a tabela principal do PDF e remove linhas de totais."""
+    tabelas = tabula.read_pdf(caminho_pdf, pages=1, multiple_tables=True)
+    print(tabelas)
+    for tabela in tabelas:
+        if 'CÓDIGO' in tabela.columns and 'DISCRIMINAÇÃO' in tabela.columns:
+            return tabela[~tabela['DISCRIMINAÇÃO'].str.contains('TOTAL|LÍQUIDO', na=False)]
+    raise ValueError("Tabela principal não encontrada no PDF")
+
+def processar_pdfs(pasta_pdfs):
+    """Processa todos os PDFs em uma pasta e retorna um DataFrame consolidado."""
+    colunas = [
+        'NOME', 'MATRÍCULA', 'VINC.', 'PENSÃO', 'CARGO', 'REFERÊNCIA', 'PIS/PASEP',
+        'FUNÇÃO', 'BCO/AGÊNCIA', 'CONTA', 'LOTAÇÃO', 'DEP IR', 'DEP SF', 'CPF',
+        'CÓDIGO', 'DISCRIMINAÇÃO', 'VANTAGENS', 'DESCONTOS', 'COMPET'
+    ]
+    dados_finais = []
+
+    for arquivo in os.listdir(pasta_pdfs):
+        if arquivo.endswith('.pdf'):
+            caminho_pdf = os.path.join(pasta_pdfs, arquivo)
+            texto = extrair_texto(caminho_pdf)
+            dados_pessoais = extrair_dados_pessoais(texto)
+            tabela = extrair_tabela(caminho_pdf)
+
+            for _, linha in tabela.iterrows():
+                dados_finais.append({**dados_pessoais, **linha.to_dict()})
+
+    return pd.DataFrame(dados_finais, columns=colunas)
 
 def converter_numero(valor):
     if isinstance(valor, (int, float)):
@@ -36,7 +87,7 @@ def converter_numero(valor):
         return float(numero_str)
     else:
         raise ValueError("Tipo de input não suportado")
-    
+
 def download_pdf(matricula=None, senha=None, vinculo=1):
 
     ano = input("Digite o ano: ")
@@ -83,31 +134,7 @@ def download_pdf(matricula=None, senha=None, vinculo=1):
         pdf_path = pasta / f"{mes_formatado}{ano}.pdf"
         pdfkit.from_url(url, str(pdf_path), options=options)
 
-        texto_pdf = extrair_texto_pdf(pdf_path)
-
-        padrao = r"registro.*encontrado\."
-        match = re.search(padrao, texto_pdf.lower())
-
-        if match is not None:
-            try:
-                os.remove(pdf_path)
-                print(f"Registro não encontado. Arquivo PDF excluído: {pdf_path}")
-                return False
-            
-            except OSError as e:
-                print(f"Erro ao excluir o arquivo PDF: {e}")
-                return False
-            
-        else:
-            padrao2 = r"líquido\s*a\s*receber\s*r\$\s*([\d.,]+)"
-            match2 = re.search(padrao2, texto_pdf.lower())
-
-            if match2 is not None:
-                valor_str = match2.group(1)  # Ex: "554,57" ou "12.345.678,90"
-                liquido = converter_numero(valor_str)  # Converte para float
-                return mes, ano, liquido
-            else:
-                raise ValueError("Valor líquido não encontrado no texto")
+        return pdf_path
 
     except requests.exceptions.RequestException as e:
         print(f"Erro ao acessar a página: {e}")
@@ -118,6 +145,13 @@ def download_pdf(matricula=None, senha=None, vinculo=1):
         return False
 
 if __name__ == "__main__":
-    print(download_pdf(matricula="00706000", senha="cyovqytx"))
+    endereco = download_pdf(matricula="00706000", senha="cyovqytx", vinculo=2)
 
     # "http://servicos.searh.rn.gov.br/searh/copag/contrachk.asp?matricula=00706000&vinculo=1&cpf=cyovqytx&ano=2003&mes=1&tipofolha="
+
+    # Configuração e execução
+if __name__ == "__main__":
+    pasta_pdfs = "folha/default"  # Ajuste para o seu diretório
+    df = processar_pdfs(pasta_pdfs)
+    df.to_excel('contracheques_detalhados.xlsx', index=False)
+    print("Planilha 'contracheques_detalhados.xlsx' gerada com sucesso!")
