@@ -1,0 +1,14 @@
+[project]
+name = "searhrnpy-contracheque"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiohttp>=3.11.16",
+    "pdfkit>=1.0.0",
+    "pypdf2>=3.0.1",
+    "requests>=2.32.3",
+    "selenium>=4.31.0",
+    "tenacity>=9.1.2",
+]
