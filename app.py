@@ -114,9 +114,16 @@ def extrair_dados_pessoais(texto):
 def extrair_tabela(caminho_pdf):
     """Lê a tabela principal do PDF e remove linhas de totais."""
     try:
-        tabelas = tabula.read_pdf(caminho_pdf, pages=1, multiple_tables=True)
+        tabelas = tabula.read_pdf(caminho_pdf, 
+                                  pages=1, 
+                                  multiple_tables=True,
+                                  lattice=True,
+                                  )
         for tabela in tabelas:
             if 'CÓDIGO' in tabela.columns and 'DISCRIMINAÇÃO' in tabela.columns:
+                # Converte a coluna DISCRIMINAÇÃO para string para evitar erros com .str
+                tabela['DISCRIMINAÇÃO'] = tabela['DISCRIMINAÇÃO'].astype(str)
+                # Filtra linhas que não contêm "TOTAL" ou "LÍQUIDO"
                 return tabela[~tabela['DISCRIMINAÇÃO'].str.contains('TOTAL|LÍQUIDO', na=False)]
         return pd.DataFrame()  # Retorna DataFrame vazio se a tabela não for encontrada
     except Exception as e:
@@ -171,22 +178,22 @@ def processar_pdfs(pasta_pdfs):
 
     return pd.DataFrame(dados_finais, columns=colunas)
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    ano_inicio = int(input("Digite o ano de início: "))
-    ano_fim = int(input("Digite o ano de fim: "))
+#     ano_inicio = int(input("Digite o ano de início: "))
+#     ano_fim = int(input("Digite o ano de fim: "))
 
-    anos = list(range(ano_inicio, ano_fim + 1))
-    meses = [1,2,3,4,5,6,7,8,9,10,11,12]
-    vinculos = [1,2]
+#     anos = list(range(ano_inicio, ano_fim + 1))
+#     meses = [1,2,3,4,5,6,7,8,9,10,11,12]
+#     vinculos = [1,2]
 
-    for ano in anos:
-        for mes in meses:
-            for vinculo in vinculos:
-                print(f"Baixando contracheque para {ano}-{mes} com vínculo {vinculo}")
-                donwload = download_pdf(matricula="00706000", senha="cyovqytx", vinculo=vinculo, ano=ano, mes=mes)
+#     for ano in anos:
+#         for mes in meses:
+#             for vinculo in vinculos:
+#                 print(f"Baixando contracheque para {ano}-{mes} com vínculo {vinculo}")
+#                 donwload = download_pdf(matricula="00706000", senha="cyovqytx", vinculo=vinculo, ano=ano, mes=mes)
 
-    # "http://servicos.searh.rn.gov.br/searh/copag/contrachk.asp?matricula=00706000&vinculo=1&cpf=cyovqytx&ano=2003&mes=1&tipofolha="
+#     # "http://servicos.searh.rn.gov.br/searh/copag/contrachk.asp?matricula=00706000&vinculo=1&cpf=cyovqytx&ano=2003&mes=1&tipofolha="
 
 if __name__ == "__main__":
     pasta_pdfs = "folha/default"  # Ajuste para o seu diretório
